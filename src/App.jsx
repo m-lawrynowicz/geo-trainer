@@ -74,9 +74,19 @@ const current = deck[deckPos] ?? null;
     if (!current) return;
 
     const user = normalize(answer);
-    const expected = normalize(current.capital);
 
-    const isCorrect = user.length > 0 && user === expected;
+// Support both schemas during transition:
+// - new: current.capitals (array)
+// - old: current.capital (string)
+const capitalList = Array.isArray(current.capitals)
+  ? current.capitals
+  : current.capital
+    ? [current.capital]
+    : [];
+
+const expectedNormalized = capitalList.map((c) => normalize(c));
+
+const isCorrect = user.length > 0 && expectedNormalized.includes(user);
 
     setFlash(isCorrect ? "correct" : "wrong");
 
