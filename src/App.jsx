@@ -5,23 +5,18 @@ import "./App.css";
 // Robust-enough v1 normalizer:
 // - lowercase
 // - remove diacritics (São -> Sao)
-// - remove punctuation/spaces (St. John's -> stjohns)
-// - expand a couple common abbreviations (st -> saint)
+// - expand "st" -> "saint"
+// - remove punctuation/spaces (St. John's -> saintjohns)
 function normalize(input) {
   if (!input) return "";
 
   let s = input
     .trim()
     .toLowerCase()
-    // remove diacritics
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  // Expand common abbreviations at word boundaries before we strip punctuation
-  // "st johns" -> "saint johns"
   s = s.replace(/\bst\b/g, "saint");
-
-  // Remove punctuation and whitespace (keep letters/numbers only)
   s = s.replace(/[^a-z0-9]/g, "");
 
   return s;
@@ -36,81 +31,102 @@ function shuffleArray(arr) {
   return a;
 }
 
-
-function pickRandomCountry(list, avoidCode) {
-  if (!list?.length) return null;
-  if (list.length === 1) return list[0];
-
-  let next = null;
-  let guard = 0;
-
-  do {
-    next = list[Math.floor(Math.random() * list.length)];
-    guard += 1;
-  } while (next?.code === avoidCode && guard < 20);
-
-  return next;
-}
-
 export default function App() {
   const data = useMemo(() => countries, []);
-  const [deck, setDeck] = useState([]);      // array of country objects
-const [deckPos, setDeckPos] = useState(0); // index into deck
 
-const current = deck[deckPos] ?? null;
+  // "idle" | "run" | "summary"
+  const [phase, setPhase] = useState("idle");
+
+  const [deck, setDeck] = useState([]);
+  const [deckPos, setDeckPos] = useState(0);
+
+  const current = deck[deckPos] ?? null;
 
   const [answer, setAnswer] = useState("");
+
+  // Per-run stats
   const [score, setScore] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
 
   // "correct" | "wrong" | null
   const [flash, setFlash] = useState(null);
 
+  // If someone refreshes mid-run, data is still there; keep it simple:
+  // startRun always defines the deck for the run.
   useEffect(() => {
-  const shuffled = shuffleArray(data);
-  setDeck(shuffled);
-  setDeckPos(0);
-}, [data]);
+    // Nothing to do on load besides having data ready.
+  }, [data]);
+
+  function startRun() {
+    const shuffled = shuffleArray(data);
+    setDeck(shuffled);
+    setDeckPos(0);
+
+    setScore(0);
+    setCurrentStreak(0);
+    setBestStreak(0);
+
+    setFlash(null);
+    setAnswer("");
+
+    setPhase("run");
+  }
+
+  function endRun() {
+    setFlash(null);
+    setAnswer("");
+    setPhase("summary");
+  }
+
+  function getCapitalList(countryObj) {
+    // Support both schemas:
+    // - new: capitals: ["Warsaw"]
+    // - old: capital: "Warsaw"
+    if (!countryObj) return [];
+    if (Array.isArray(countryObj.capitals)) return countryObj.capitals;
+    if (countryObj.capital) return [countryObj.capital];
+    return [];
+  }
+
   function submitAnswer() {
     if (!current) return;
 
     const user = normalize(answer);
 
-// Support both schemas during transition:
-// - new: current.capitals (array)
-// - old: current.capital (string)
-const capitalList = Array.isArray(current.capitals)
-  ? current.capitals
-  : current.capital
-    ? [current.capital]
-    : [];
+    const capitalList = getCapitalList(current);
+    const expectedNormalized = capitalList.map((c) => normalize(c));
 
-const expectedNormalized = capitalList.map((c) => normalize(c));
-
-const isCorrect = user.length > 0 && expectedNormalized.includes(user);
+    const isCorrect = user.length > 0 && expectedNormalized.includes(user);
 
     setFlash(isCorrect ? "correct" : "wrong");
 
-    if (isCorrect) setScore((s) => s + 1);
+    if (isCorrect) {
+      setScore((s) => s + 1);
 
-    // Immediately move on (timed-mode friendly)
-setDeckPos((pos) => {
-  const nextPos = pos + 1;
+      setCurrentStreak((st) => {
+        const next = st + 1;
+        setBestStreak((best) => Math.max(best, next));
+        return next;
+      });
+    } else {
+      setCurrentStreak(0);
+    }
 
-  // If we finished the deck, reshuffle and start over
-  if (nextPos >= deck.length) {
-    setDeck(shuffleArray(data));
-    return 0;
-  }
+    // Immediately advance (timed-mode friendly). End run if we hit the end.
+    const nextPos = deckPos + 1;
 
-  return nextPos;
-});
-
-
-    // Clear input for next question
-    setAnswer("");
-
-    // Turn off flash after a short moment
-    window.setTimeout(() => setFlash(null), 250);
+    if (nextPos >= deck.length) {
+      // tiny flash still happens; end after it
+      window.setTimeout(() => {
+        setFlash(null);
+        endRun();
+      }, 250);
+    } else {
+      setDeckPos(nextPos);
+      setAnswer("");
+      window.setTimeout(() => setFlash(null), 250);
+    }
   }
 
   function onKeyDown(e) {
@@ -120,17 +136,111 @@ setDeckPos((pos) => {
     }
   }
 
-  if (!current) return <div style={{ padding: 16 }}>Loading…</div>;
+  const total = deck.length;
+  const progress = phase === "run" && total > 0 ? deckPos + 1 : 0;
+
+  // ---------- UI ----------
+  const containerStyle = { padding: 16, maxWidth: 720, margin: "0 auto" };
+
+  if (phase === "idle") {
+    return (
+      <div style={containerStyle}>
+        <h1 style={{ marginBottom: 8 }}>Jungle Geo-Trainer</h1>
+        <p style={{ opacity: 0.8, marginTop: 0 }}>
+          One run = one full shuffled deck. No answer reveals yet.
+        </p>
+
+        <button
+          onClick={startRun}
+          style={{
+            padding: "12px 14px",
+            fontSize: 16,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            cursor: "pointer",
+          }}
+        >
+          Start run
+        </button>
+
+        <div style={{ marginTop: 14, opacity: 0.7, fontSize: 13 }}>
+          Dataset loaded: <b>{data.length}</b> countries
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "summary") {
+    return (
+      <div style={containerStyle}>
+        <h1 style={{ marginBottom: 8 }}>Run summary</h1>
+
+        <div style={{ fontSize: 18, marginBottom: 8 }}>
+          Score: <b>{score}</b> / <b>{total}</b>
+        </div>
+
+        <div style={{ fontSize: 18, marginBottom: 12 }}>
+          Best streak: <b>{bestStreak}</b>
+        </div>
+
+        <button
+          onClick={startRun}
+          style={{
+            padding: "12px 14px",
+            fontSize: 16,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            cursor: "pointer",
+            marginRight: 8,
+          }}
+        >
+          Start new run
+        </button>
+
+        <button
+          onClick={() => setPhase("idle")}
+          style={{
+            padding: "12px 14px",
+            fontSize: 16,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            cursor: "pointer",
+          }}
+        >
+          Back to start
+        </button>
+
+        <div style={{ marginTop: 14, opacity: 0.7, fontSize: 13 }}>
+          Next up later: teaching mode + timer.
+        </div>
+      </div>
+    );
+  }
+
+  // phase === "run"
+  if (!current) return <div style={containerStyle}>Loading…</div>;
 
   return (
-    <div style={{ padding: 16, maxWidth: 720, margin: "0 auto" }}>
+    <div style={containerStyle}>
       <h1 style={{ marginBottom: 8 }}>Jungle Geo-Trainer</h1>
 
-      <div style={{ marginBottom: 12, fontSize: 18 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", opacity: 0.85 }}>
+        <div>
+          Progress: <b>{progress}</b> / <b>{total}</b>
+        </div>
+        <div>
+          Score: <b>{score}</b>
+        </div>
+        <div>
+          Streak: <b>{currentStreak}</b> (best <b>{bestStreak}</b>)
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 18 }}>
         What is the capital of <b>{current.country}</b>?
       </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
         <input
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
@@ -176,13 +286,20 @@ setDeckPos((pos) => {
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        Score: <b>{score}</b>
-      </div>
-
-      <div style={{ marginTop: 6, opacity: 0.7, fontSize: 13 }}>
-        No answer reveal yet (teaching mode later). Quick feedback only.
-      </div>
+      <button
+        onClick={endRun}
+        style={{
+          marginTop: 14,
+          padding: "10px 12px",
+          fontSize: 14,
+          borderRadius: 10,
+          border: "1px solid #ccc",
+          cursor: "pointer",
+          opacity: 0.8,
+        }}
+      >
+        End run
+      </button>
     </div>
   );
 }
