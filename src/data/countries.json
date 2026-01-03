@@ -121,7 +121,7 @@
   { "country": "Paraguay", "capital": "Asunción", "code": "py", "region": "Americas" },
   { "country": "Peru", "capital": "Lima", "code": "pe", "region": "Americas" },
   { "country": "Philippines", "capital": "Manila", "code": "ph", "region": "Asia" },
-  { "country": "Poland", "capital": "Warszawa", "code": "pl", "region": "Europe" },
+  { "country": "Poland", "capital": "Warsaw", "code": "pl", "region": "Europe" },
   { "country": "Portugal", "capital": "Lisboa", "code": "pt", "region": "Europe" },
   { "country": "Qatar", "capital": "Doha", "code": "qa", "region": "Asia" },
   { "country": "Romania", "capital": "Bucuresti", "code": "ro", "region": "Europe" },

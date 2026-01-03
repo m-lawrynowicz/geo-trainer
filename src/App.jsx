@@ -27,6 +27,16 @@ function normalize(input) {
   return s;
 }
 
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+
 function pickRandomCountry(list, avoidCode) {
   if (!list?.length) return null;
   if (list.length === 1) return list[0];
@@ -44,7 +54,10 @@ function pickRandomCountry(list, avoidCode) {
 
 export default function App() {
   const data = useMemo(() => countries, []);
-  const [current, setCurrent] = useState(null);
+  const [deck, setDeck] = useState([]);      // array of country objects
+const [deckPos, setDeckPos] = useState(0); // index into deck
+
+const current = deck[deckPos] ?? null;
 
   const [answer, setAnswer] = useState("");
   const [score, setScore] = useState(0);
@@ -53,10 +66,10 @@ export default function App() {
   const [flash, setFlash] = useState(null);
 
   useEffect(() => {
-    // initial question
-    setCurrent(pickRandomCountry(data));
-  }, [data]);
-
+  const shuffled = shuffleArray(data);
+  setDeck(shuffled);
+  setDeckPos(0);
+}, [data]);
   function submitAnswer() {
     if (!current) return;
 
@@ -70,8 +83,18 @@ export default function App() {
     if (isCorrect) setScore((s) => s + 1);
 
     // Immediately move on (timed-mode friendly)
-    const next = pickRandomCountry(data, current.code);
-    setCurrent(next);
+setDeckPos((pos) => {
+  const nextPos = pos + 1;
+
+  // If we finished the deck, reshuffle and start over
+  if (nextPos >= deck.length) {
+    setDeck(shuffleArray(data));
+    return 0;
+  }
+
+  return nextPos;
+});
+
 
     // Clear input for next question
     setAnswer("");
