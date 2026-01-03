@@ -224,17 +224,33 @@ export default function App() {
     <div style={containerStyle}>
       <h1 style={{ marginBottom: 8 }}>Jungle Geo-Trainer</h1>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", opacity: 0.85 }}>
-        <div>
-          Progress: <b>{progress}</b> / <b>{total}</b>
-        </div>
-        <div>
-          Score: <b>{score}</b>
-        </div>
-        <div>
-          Streak: <b>{currentStreak}</b> (best <b>{bestStreak}</b>)
-        </div>
-      </div>
+      <div
+  style={{
+    display: "flex",
+    gap: 24,
+    justifyContent: "center",
+    flexWrap: "wrap",
+    opacity: 0.85,
+    marginTop: 8,
+    marginBottom: 16,
+    textAlign: "center",
+  }}
+>
+  <div>
+    Progress<br />
+    <b>{progress}</b> / <b>{total}</b>
+  </div>
+
+  <div>
+    Score<br />
+    <b>{score}</b>
+  </div>
+
+  <div>
+    Streak<br />
+    <b>{currentStreak}</b> (best <b>{bestStreak}</b>)
+  </div>
+</div>
 
       <div style={{ marginTop: 12, fontSize: 18 }}>
         What is the capital of <b>{current.country}</b>?
