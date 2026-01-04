@@ -37,6 +37,13 @@ export default function App() {
   // "idle" | "run" | "summary"
   const [phase, setPhase] = useState("idle");
 
+  // "deck" | "timed"
+  const [mode, setMode] = useState("timed");
+
+  // Timer config (used only for timed mode)
+  const [timeLimitSec, setTimeLimitSec] = useState(60);
+  const [timeLeftSec, setTimeLeftSec] = useState(0);
+
   const [deck, setDeck] = useState([]);
   const [deckPos, setDeckPos] = useState(0);
   const current = deck[deckPos] ?? null;
@@ -46,13 +53,8 @@ export default function App() {
   // Per-run stats
   const [score, setScore] = useState(0);
   const [attempts, setAttempts] = useState(0);
-
   const [currentStreak, setCurrentStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
-
-  // Timer
-  const [timeLimitSec] = useState(60); // change later or make configurable
-  const [timeLeftSec, setTimeLeftSec] = useState(0);
 
   // "correct" | "wrong" | null
   const [flash, setFlash] = useState(null);
@@ -70,7 +72,12 @@ export default function App() {
     setFlash(null);
     setAnswer("");
 
-    setTimeLeftSec(timeLimitSec);
+    if (mode === "timed") {
+      setTimeLeftSec(timeLimitSec);
+    } else {
+      setTimeLeftSec(0);
+    }
+
     setPhase("run");
   }
 
@@ -81,18 +88,16 @@ export default function App() {
   }
 
   function getCapitalList(countryObj) {
-    // Support both schemas:
-    // - new: capitals: ["Warsaw"]
-    // - old: capital: "Warsaw"
     if (!countryObj) return [];
     if (Array.isArray(countryObj.capitals)) return countryObj.capitals;
     if (countryObj.capital) return [countryObj.capital];
     return [];
   }
 
-  // Countdown tick while in "run"
+  // Countdown tick while in "run" AND mode === "timed"
   useEffect(() => {
     if (phase !== "run") return;
+    if (mode !== "timed") return;
     if (timeLeftSec <= 0) return;
 
     const id = window.setInterval(() => {
@@ -100,24 +105,23 @@ export default function App() {
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [phase, timeLeftSec]);
+  }, [phase, mode, timeLeftSec]);
 
-  // End run when time is up
+  // End run when time is up (timed mode)
   useEffect(() => {
     if (phase !== "run") return;
+    if (mode !== "timed") return;
     if (timeLeftSec === 0) endRun();
-  }, [phase, timeLeftSec]);
+  }, [phase, mode, timeLeftSec]);
 
   function submitAnswer() {
     if (phase !== "run") return;
     if (!current) return;
-    if (timeLeftSec <= 0) return;
+    if (mode === "timed" && timeLeftSec <= 0) return;
 
     const user = normalize(answer);
-
     const capitalList = getCapitalList(current);
     const expectedNormalized = capitalList.map((c) => normalize(c));
-
     const isCorrect = user.length > 0 && expectedNormalized.includes(user);
 
     setAttempts((a) => a + 1);
@@ -125,7 +129,6 @@ export default function App() {
 
     if (isCorrect) {
       setScore((s) => s + 1);
-
       setCurrentStreak((st) => {
         const next = st + 1;
         setBestStreak((best) => Math.max(best, next));
@@ -135,19 +138,33 @@ export default function App() {
       setCurrentStreak(0);
     }
 
-    // Immediately advance. If we hit end-of-deck, finish the run early.
+    // Advance immediately
     const nextPos = deckPos + 1;
 
+    // If we hit end-of-deck:
     if (nextPos >= deck.length) {
-      window.setTimeout(() => {
-        setFlash(null);
-        endRun();
-      }, 250);
-    } else {
-      setDeckPos(nextPos);
+      if (mode === "deck") {
+        // Deck mode ends the run when the deck ends
+        window.setTimeout(() => {
+          setFlash(null);
+          endRun();
+        }, 250);
+        return;
+      }
+
+      // Timed mode: reshuffle and continue (infinite supply while timer runs)
+      const reshuffled = shuffleArray(data);
+      setDeck(reshuffled);
+      setDeckPos(0);
       setAnswer("");
       window.setTimeout(() => setFlash(null), 250);
+      return;
     }
+
+    // Normal next card
+    setDeckPos(nextPos);
+    setAnswer("");
+    window.setTimeout(() => setFlash(null), 250);
   }
 
   function onKeyDown(e) {
@@ -183,7 +200,7 @@ export default function App() {
             cursor: "pointer",
           }}
         >
-          Start run ({timeLimitSec}s)
+          Start {mode === "timed" ? `timed run (${timeLimitSec}s)` : "deck run"}
         </button>
 
         <div style={{ marginTop: 14, opacity: 0.7, fontSize: 13 }}>
@@ -222,7 +239,7 @@ export default function App() {
             marginRight: 8,
           }}
         >
-          Start new run
+          Start again
         </button>
 
         <button
@@ -239,7 +256,7 @@ export default function App() {
         </button>
 
         <div style={{ marginTop: 14, opacity: 0.7, fontSize: 13 }}>
-          Next up later: teaching mode + configurable timer.
+          Next up later: teaching mode.
         </div>
       </div>
     );
