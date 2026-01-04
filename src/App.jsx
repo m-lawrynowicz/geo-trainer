@@ -182,17 +182,113 @@ export default function App() {
   const containerStyle = { padding: 16, maxWidth: 720, margin: "0 auto" };
 
   if (phase === "idle") {
+    const timerOptions = [30, 60, 120];
+
     return (
       <div style={containerStyle}>
         <h1 style={{ marginBottom: 8 }}>Jungle Geo-Trainer</h1>
         <p style={{ opacity: 0.8, marginTop: 0 }}>
-          One run = one full shuffled deck or until the timer ends. No answer
-          reveals yet.
+          No answer reveals yet. Pick a mode, then start.
         </p>
+
+        <div style={{ marginTop: 12 }}>
+          <div
+  style={{
+    fontSize: 14,
+    opacity: 0.8,
+    marginBottom: 6,
+    textAlign: "center",
+  }}
+>
+  Mode
+</div>
+
+
+          <div
+  style={{
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  }}
+>
+            <button
+              onClick={() => setMode("deck")}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                cursor: "pointer",
+                fontSize: 14,
+                opacity: mode === "deck" ? 1 : 0.75,
+              }}
+            >
+              Deck run
+            </button>
+
+            <button
+              onClick={() => setMode("timed")}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                cursor: "pointer",
+                fontSize: 14,
+                opacity: mode === "timed" ? 1 : 0.75,
+              }}
+            >
+              Timed run
+            </button>
+          </div>
+
+          {mode === "deck" ? (
+            <div style={{ marginTop: 10, opacity: 0.75, fontSize: 13 }}>
+              Deck run ends when you finish the shuffled deck.
+            </div>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 14, opacity: 0.8, marginBottom: 6 }}>
+                Timer
+              </div>
+
+              <div
+  style={{
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  }}
+>
+
+                {timerOptions.map((sec) => (
+                  <button
+                    key={sec}
+                    onClick={() => setTimeLimitSec(sec)}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid #ccc",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      opacity: timeLimitSec === sec ? 1 : 0.75,
+                    }}
+                  >
+                    {sec}s
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 10, opacity: 0.75, fontSize: 13 }}>
+                Timed run ends when the timer hits 0. Deck reshuffles if needed.
+              </div>
+            </div>
+          )}
+        </div>
 
         <button
           onClick={startRun}
           style={{
+            marginTop: 16,
             padding: "12px 14px",
             fontSize: 16,
             borderRadius: 10,
@@ -215,17 +311,23 @@ export default function App() {
       <div style={containerStyle}>
         <h1 style={{ marginBottom: 8 }}>Run summary</h1>
 
+        <div style={{ fontSize: 14, opacity: 0.75, marginBottom: 10 }}>
+          Mode: <b>{mode === "timed" ? "Timed" : "Deck"}</b>
+          {mode === "timed" && (
+            <>
+              {" "}
+              · Time limit: <b>{timeLimitSec}s</b>
+            </>
+          )}
+        </div>
+
         <div style={{ fontSize: 18, marginBottom: 8 }}>
           Correct: <b>{score}</b> / <b>{attempts}</b>{" "}
           <span style={{ opacity: 0.75 }}>(accuracy {accuracy}%)</span>
         </div>
 
-        <div style={{ fontSize: 18, marginBottom: 8 }}>
+        <div style={{ fontSize: 18, marginBottom: 12 }}>
           Best streak: <b>{bestStreak}</b>
-        </div>
-
-        <div style={{ fontSize: 14, opacity: 0.75, marginBottom: 14 }}>
-          Time limit: <b>{timeLimitSec}s</b>
         </div>
 
         <button
@@ -282,14 +384,16 @@ export default function App() {
           textAlign: "center",
         }}
       >
-        <div>
-          Time
-          <br />
-          <b>{timeLeftSec}s</b>
-        </div>
+        {mode === "timed" && (
+          <div>
+            Time
+            <br />
+            <b>{timeLeftSec}s</b>
+          </div>
+        )}
 
         <div>
-          Card
+          {mode === "deck" ? "Card" : "Deck"}
           <br />
           <b>{progress}</b> / <b>{total}</b>
         </div>
