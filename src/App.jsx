@@ -39,24 +39,23 @@ export default function App() {
 
   const [deck, setDeck] = useState([]);
   const [deckPos, setDeckPos] = useState(0);
-
   const current = deck[deckPos] ?? null;
 
   const [answer, setAnswer] = useState("");
 
   // Per-run stats
   const [score, setScore] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+
   const [currentStreak, setCurrentStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
 
+  // Timer
+  const [timeLimitSec] = useState(60); // change later or make configurable
+  const [timeLeftSec, setTimeLeftSec] = useState(0);
+
   // "correct" | "wrong" | null
   const [flash, setFlash] = useState(null);
-
-  // If someone refreshes mid-run, data is still there; keep it simple:
-  // startRun always defines the deck for the run.
-  useEffect(() => {
-    // Nothing to do on load besides having data ready.
-  }, [data]);
 
   function startRun() {
     const shuffled = shuffleArray(data);
@@ -64,12 +63,14 @@ export default function App() {
     setDeckPos(0);
 
     setScore(0);
+    setAttempts(0);
     setCurrentStreak(0);
     setBestStreak(0);
 
     setFlash(null);
     setAnswer("");
 
+    setTimeLeftSec(timeLimitSec);
     setPhase("run");
   }
 
@@ -89,8 +90,28 @@ export default function App() {
     return [];
   }
 
+  // Countdown tick while in "run"
+  useEffect(() => {
+    if (phase !== "run") return;
+    if (timeLeftSec <= 0) return;
+
+    const id = window.setInterval(() => {
+      setTimeLeftSec((t) => t - 1);
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [phase, timeLeftSec]);
+
+  // End run when time is up
+  useEffect(() => {
+    if (phase !== "run") return;
+    if (timeLeftSec === 0) endRun();
+  }, [phase, timeLeftSec]);
+
   function submitAnswer() {
+    if (phase !== "run") return;
     if (!current) return;
+    if (timeLeftSec <= 0) return;
 
     const user = normalize(answer);
 
@@ -99,6 +120,7 @@ export default function App() {
 
     const isCorrect = user.length > 0 && expectedNormalized.includes(user);
 
+    setAttempts((a) => a + 1);
     setFlash(isCorrect ? "correct" : "wrong");
 
     if (isCorrect) {
@@ -113,11 +135,10 @@ export default function App() {
       setCurrentStreak(0);
     }
 
-    // Immediately advance (timed-mode friendly). End run if we hit the end.
+    // Immediately advance. If we hit end-of-deck, finish the run early.
     const nextPos = deckPos + 1;
 
     if (nextPos >= deck.length) {
-      // tiny flash still happens; end after it
       window.setTimeout(() => {
         setFlash(null);
         endRun();
@@ -138,6 +159,7 @@ export default function App() {
 
   const total = deck.length;
   const progress = phase === "run" && total > 0 ? deckPos + 1 : 0;
+  const accuracy = attempts > 0 ? Math.round((score / attempts) * 100) : 0;
 
   // ---------- UI ----------
   const containerStyle = { padding: 16, maxWidth: 720, margin: "0 auto" };
@@ -147,7 +169,8 @@ export default function App() {
       <div style={containerStyle}>
         <h1 style={{ marginBottom: 8 }}>Jungle Geo-Trainer</h1>
         <p style={{ opacity: 0.8, marginTop: 0 }}>
-          One run = one full shuffled deck. No answer reveals yet.
+          One run = one full shuffled deck or until the timer ends. No answer
+          reveals yet.
         </p>
 
         <button
@@ -160,7 +183,7 @@ export default function App() {
             cursor: "pointer",
           }}
         >
-          Start run
+          Start run ({timeLimitSec}s)
         </button>
 
         <div style={{ marginTop: 14, opacity: 0.7, fontSize: 13 }}>
@@ -176,11 +199,16 @@ export default function App() {
         <h1 style={{ marginBottom: 8 }}>Run summary</h1>
 
         <div style={{ fontSize: 18, marginBottom: 8 }}>
-          Score: <b>{score}</b> / <b>{total}</b>
+          Correct: <b>{score}</b> / <b>{attempts}</b>{" "}
+          <span style={{ opacity: 0.75 }}>(accuracy {accuracy}%)</span>
         </div>
 
-        <div style={{ fontSize: 18, marginBottom: 12 }}>
+        <div style={{ fontSize: 18, marginBottom: 8 }}>
           Best streak: <b>{bestStreak}</b>
+        </div>
+
+        <div style={{ fontSize: 14, opacity: 0.75, marginBottom: 14 }}>
+          Time limit: <b>{timeLimitSec}s</b>
         </div>
 
         <button
@@ -211,7 +239,7 @@ export default function App() {
         </button>
 
         <div style={{ marginTop: 14, opacity: 0.7, fontSize: 13 }}>
-          Next up later: teaching mode + timer.
+          Next up later: teaching mode + configurable timer.
         </div>
       </div>
     );
@@ -224,33 +252,43 @@ export default function App() {
     <div style={containerStyle}>
       <h1 style={{ marginBottom: 8 }}>Jungle Geo-Trainer</h1>
 
+      {/* Centered “HUD” */}
       <div
-  style={{
-    display: "flex",
-    gap: 24,
-    justifyContent: "center",
-    flexWrap: "wrap",
-    opacity: 0.85,
-    marginTop: 8,
-    marginBottom: 16,
-    textAlign: "center",
-  }}
->
-  <div>
-    Progress<br />
-    <b>{progress}</b> / <b>{total}</b>
-  </div>
+        style={{
+          display: "flex",
+          gap: 24,
+          justifyContent: "center",
+          flexWrap: "wrap",
+          opacity: 0.85,
+          marginTop: 8,
+          marginBottom: 16,
+          textAlign: "center",
+        }}
+      >
+        <div>
+          Time
+          <br />
+          <b>{timeLeftSec}s</b>
+        </div>
 
-  <div>
-    Score<br />
-    <b>{score}</b>
-  </div>
+        <div>
+          Card
+          <br />
+          <b>{progress}</b> / <b>{total}</b>
+        </div>
 
-  <div>
-    Streak<br />
-    <b>{currentStreak}</b> (best <b>{bestStreak}</b>)
-  </div>
-</div>
+        <div>
+          Correct
+          <br />
+          <b>{score}</b> / <b>{attempts}</b>
+        </div>
+
+        <div>
+          Streak
+          <br />
+          <b>{currentStreak}</b> (best <b>{bestStreak}</b>)
+        </div>
+      </div>
 
       <div style={{ marginTop: 12, fontSize: 18 }}>
         What is the capital of <b>{current.country}</b>?
